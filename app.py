@@ -13,7 +13,7 @@ from db import (
 )
 
 # =========================
-# PAGE CONFIG
+# CONFIG
 # =========================
 
 st.set_page_config(
@@ -23,7 +23,7 @@ st.set_page_config(
 )
 
 # =========================
-# GLOBAL UI STYLE
+# UI THEME (MODERN GLASS)
 # =========================
 
 st.markdown("""
@@ -45,11 +45,10 @@ st.markdown("""
     background: rgba(10, 12, 20, 0.78);
 }
 
-/* MAIN CONTENT */
+/* CONTENT */
 .block-container {
     position: relative;
     z-index: 2;
-    padding-top: 2rem;
 }
 
 /* SIDEBAR */
@@ -63,14 +62,14 @@ h1,h2,h3,p,label {
     color: white !important;
 }
 
-/* INPUT */
+/* INPUTS */
 .stTextInput input, .stTextArea textarea {
     background: rgba(255,255,255,0.08);
     color: white;
     border-radius: 10px;
 }
 
-/* BUTTON */
+/* BUTTONS */
 .stButton > button {
     width: 100%;
     background: linear-gradient(135deg, #6a11cb, #2575fc);
@@ -89,10 +88,10 @@ h1,h2,h3,p,label {
 """, unsafe_allow_html=True)
 
 # =========================
-# LOGIN SYSTEM (SIDEBAR)
+# AUTH (SIDEBAR)
 # =========================
 
-st.sidebar.markdown("## 🧠 AI Analyst SaaS")
+st.sidebar.title("🧠 AI SaaS Login")
 
 username = st.sidebar.text_input("Username")
 password = st.sidebar.text_input("Password", type="password")
@@ -150,7 +149,7 @@ st.sidebar.write("📦 Plan:", plan)
 st.sidebar.write("📊 Usage:", f"{usage}/{FREE_LIMIT}" if plan=="free" else "∞")
 
 if plan == "free":
-    if st.sidebar.button("⚡ Upgrade to Pro"):
+    if st.sidebar.button("⚡ Upgrade Pro"):
         set_plan(user, "pro")
         st.rerun()
 
@@ -165,28 +164,37 @@ def can_use():
     return plan == "pro" or usage < FREE_LIMIT
 
 # =========================
-# AI ENGINE
+# AI ENGINE (STABLE FALLBACK)
 # =========================
 
 def call_ai(prompt):
 
-    try:
-        r = requests.post(
-            "https://text.pollinations.ai/",
-            json={"prompt": prompt},
-            timeout=30
-        )
-        if r.status_code == 200:
-            return r.text
-    except:
-        pass
+    endpoints = [
+        "https://text.pollinations.ai/",
+        "https://api.pollinations.ai/text"
+    ]
 
-    return "⚠️ AI temporarily unavailable"
+    for url in endpoints:
+
+        try:
+            r = requests.get(
+                url,
+                params={"prompt": prompt},
+                timeout=45
+            )
+
+            if r.status_code == 200 and r.text:
+                return r.text
+
+        except:
+            continue
+
+    return "⚠️ AI service temporarily unavailable"
 
 def run_ai(prompt):
 
     if not can_use():
-        return "🚫 Limit reached. Upgrade Pro."
+        return "🚫 Free limit reached. Upgrade Pro."
 
     increment_usage(user)
 
@@ -205,7 +213,7 @@ st.markdown("---")
 # TABS
 # =========================
 
-tab1, tab2, tab3 = st.tabs(["🧠 AI ANALYST", "📊 DATA DASHBOARD", "📄 REPORTS"])
+tab1, tab2, tab3 = st.tabs(["🧠 AI ANALYST", "📊 DASHBOARD", "📄 REPORTS"])
 
 # =========================
 # TAB 1 - AI
@@ -215,13 +223,16 @@ with tab1:
 
     st.subheader("AI Analysis Engine")
 
-    text = st.text_area("Enter data / question", height=150)
+    text = st.text_area("Enter your data / question", height=150)
 
-    if st.button("Run AI") and text:
+    if st.button("🚀 Run AI") and text:
 
-        result = run_ai(f"Analyze professionally:\n{text}")
+        with st.spinner("Analyzing..."):
+
+            result = run_ai(f"Analyze professionally:\n{text}")
 
         st.success("Done")
+
         st.write(result)
 
 # =========================
@@ -248,7 +259,7 @@ with tab2:
 
             st.line_chart(df[col])
 
-            if st.button("AI Insight"):
+            if st.button("🧠 AI Insight"):
 
                 result = run_ai(df[col].to_string())
 
