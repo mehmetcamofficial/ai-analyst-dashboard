@@ -1,7 +1,7 @@
 import streamlit as st
-from db import check_login, create_user
+from db import create_user, check_login
 
-def login():
+def login_system():
 
     st.sidebar.title("🔐 Login")
 
@@ -9,6 +9,8 @@ def login():
     password = st.sidebar.text_input("Password", type="password")
 
     mode = st.sidebar.radio("Mode", ["Login", "Register"])
+
+    user = None
 
     if username and password:
 
@@ -19,8 +21,12 @@ def login():
         if mode == "Login":
             if check_login(username, password):
                 st.session_state["user"] = username
-                return username
+                user = username
+                st.sidebar.success("Login success")
             else:
                 st.sidebar.error("Invalid credentials")
 
-    return None
+    if "user" in st.session_state:
+        user = st.session_state["user"]
+
+    return user
