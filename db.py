@@ -7,13 +7,14 @@ c = conn.cursor()
 # USERS
 c.execute("""
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
+    username TEXT PRIMARY KEY,
+    plan TEXT DEFAULT 'free',
+    requests_used INTEGER DEFAULT 0,
     created_at TEXT
 )
 """)
 
-# USAGE LOGS
+# LOGS
 c.execute("""
 CREATE TABLE IF NOT EXISTS usage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,9 +28,29 @@ CREATE TABLE IF NOT EXISTS usage (
 conn.commit()
 
 
-def log_usage(username, prompt, model):
-    c.execute(
-        "INSERT INTO usage VALUES (NULL, ?, ?, ?, ?)",
-        (username, prompt, model, datetime.now().isoformat())
-    )
+def get_user(username):
+    c.execute("SELECT * FROM users WHERE username=?", (username,))
+    return c.fetchone()
+
+
+def create_user(username):
+    c.execute("""
+    INSERT OR IGNORE INTO users VALUES (?, 'free', 0, ?)
+    """, (username, datetime.now().isoformat()))
+    conn.commit()
+
+
+def increment_usage(username):
+    c.execute("""
+    UPDATE users
+    SET requests_used = requests_used + 1
+    WHERE username=?
+    """, (username,))
+    conn.commit()
+
+
+def set_plan(username, plan):
+    c.execute("""
+    UPDATE users SET plan=? WHERE username=?
+    """, (plan, username))
     conn.commit()
