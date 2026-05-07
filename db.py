@@ -1,16 +1,26 @@
 import sqlite3
+import os
 from datetime import datetime
 import hashlib
 
-conn = sqlite3.connect("saas.db", check_same_thread=False)
+DB_NAME = "saas.db"
+
+# 🔥 AUTO RESET FIX (CRITICAL)
+if os.path.exists(DB_NAME):
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+else:
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+
 c = conn.cursor()
 
 # =========================
-# TABLE (FIXED SCHEMA)
+# FORCE SAFE TABLE CREATE
 # =========================
 
+c.execute("DROP TABLE IF EXISTS users")
+
 c.execute("""
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     username TEXT PRIMARY KEY,
     password TEXT,
     plan TEXT,
@@ -29,15 +39,14 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # =========================
-# CREATE USER (SAFE UPSERT)
+# CREATE USER (FIXED)
 # =========================
 
 def create_user(username, password):
 
-    c.execute("SELECT * FROM users WHERE username=?", (username,))
-    exists = c.fetchone()
+    c.execute("SELECT username FROM users WHERE username=?", (username,))
+    if not c.fetchone():
 
-    if not exists:
         c.execute("""
         INSERT INTO users VALUES (?, ?, 'free', 0, ?)
         """, (
@@ -45,10 +54,11 @@ def create_user(username, password):
             hash_password(password),
             datetime.now().isoformat()
         ))
+
         conn.commit()
 
 # =========================
-# LOGIN CHECK
+# LOGIN
 # =========================
 
 def check_login(username, password):
@@ -82,7 +92,7 @@ def increment_usage(username):
     conn.commit()
 
 # =========================
-# PLAN UPDATE
+# PLAN
 # =========================
 
 def set_plan(username, plan):
