@@ -1,43 +1,62 @@
 import sqlite3
 from datetime import datetime
+import hashlib
 
 conn = sqlite3.connect("saas.db", check_same_thread=False)
 c = conn.cursor()
 
-# USERS
+# USERS TABLE
 c.execute("""
 CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
+    password TEXT,
     plan TEXT DEFAULT 'free',
     requests_used INTEGER DEFAULT 0,
     created_at TEXT
 )
 """)
 
-# LOGS
-c.execute("""
-CREATE TABLE IF NOT EXISTS usage (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    prompt TEXT,
-    model TEXT,
-    timestamp TEXT
-)
-""")
-
 conn.commit()
 
 
+# -------------------------
+# HASH PASSWORD
+# -------------------------
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+# -------------------------
+# CREATE USER
+# -------------------------
+def create_user(username, password):
+    c.execute("SELECT * FROM users WHERE username=?", (username,))
+    if not c.fetchone():
+        c.execute("""
+        INSERT INTO users VALUES (?, ?, 'free', 0, ?)
+        """, (username, hash_password(password), datetime.now().isoformat()))
+        conn.commit()
+
+
+# -------------------------
+# LOGIN CHECK
+# -------------------------
+def check_login(username, password):
+    c.execute("SELECT password FROM users WHERE username=?", (username,))
+    row = c.fetchone()
+
+    if not row:
+        return False
+
+    return row[0] == hash_password(password)
+
+
+# -------------------------
+# USER INFO
+# -------------------------
 def get_user(username):
     c.execute("SELECT * FROM users WHERE username=?", (username,))
     return c.fetchone()
-
-
-def create_user(username):
-    c.execute("""
-    INSERT OR IGNORE INTO users VALUES (?, 'free', 0, ?)
-    """, (username, datetime.now().isoformat()))
-    conn.commit()
 
 
 def increment_usage(username):
