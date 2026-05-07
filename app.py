@@ -1,90 +1,137 @@
 import streamlit as st
-import pandas as pd
 import requests
-import time
-import plotly.express as px
+import pandas as pd
 import numpy as np
+import time
 
-from db import (
-    create_user,
-    check_login,
-    get_user,
-    increment_usage,
-    set_plan
+from db import create_user, check_login, get_user, increment_usage, set_plan
+
+# =========================
+# PAGE CONFIG
+# =========================
+
+st.set_page_config(
+    page_title="AI Analyst Pro",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-from pdf_report import generate_pdf
-
 # =========================
-# CONFIG
+# BACKGROUND UI (MODERN)
 # =========================
 
-st.set_page_config(page_title="AI Analyst Pro SaaS", layout="wide")
+page_bg_img = """
+<style>
+[data-testid="stAppViewContainer"] {
+    background-image: url("https://images.unsplash.com/photo-1557682250-33bd709cbe85");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
 
-API_KEY = st.secrets.get("POLLINATIONS_API_KEY", "")
+[data-testid="stHeader"] {
+    background: rgba(0,0,0,0);
+}
 
-FREE_LIMIT = 20
+.main {
+    background-color: rgba(0,0,0,0.65);
+    padding: 20px;
+    border-radius: 20px;
+}
+
+div.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+h1, h2, h3, p {
+    color: white !important;
+}
+</style>
+"""
+
+st.markdown(page_bg_img, unsafe_allow_html=True)
 
 # =========================
-# AUTH SYSTEM
+# SESSION INIT
 # =========================
 
-st.sidebar.title("🔐 AI SaaS Login")
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-username = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password", type="password")
+# =========================
+# LOGIN UI (MODERN CARD)
+# =========================
 
-mode = st.sidebar.radio("Mode", ["Login", "Register"])
+st.title("🧠 AI Analyst Pro SaaS")
 
-user = None
+st.markdown("### Login / Register")
 
-if username and password:
+col1, col2 = st.columns(2)
 
-    if mode == "Register":
-        create_user(username, password)
-        st.sidebar.success("Account created")
+with col1:
+    username = st.text_input("Username")
 
-    if mode == "Login":
-        if check_login(username, password):
-            st.session_state["user"] = username
-            user = username
-            st.sidebar.success("Logged in")
-        else:
-            st.sidebar.error("Invalid credentials")
+with col2:
+    password = st.text_input("Password", type="password")
 
-if "user" in st.session_state:
-    user = st.session_state["user"]
+mode = st.radio("Mode", ["Login", "Register"])
 
-if not user:
-    st.warning("Please login to continue")
+if st.button("Continue"):
+
+    if username and password:
+
+        if mode == "Register":
+            create_user(username, password)
+            st.success("Account created! Now login.")
+
+        elif mode == "Login":
+            if check_login(username, password):
+                st.session_state.user = username
+                st.success("Login successful!")
+                st.rerun()
+            else:
+                st.error("Invalid credentials")
+
+# =========================
+# BLOCK IF NOT LOGGED IN
+# =========================
+
+if not st.session_state.user:
     st.stop()
+
+user = st.session_state.user
 
 # =========================
 # USER DATA
 # =========================
-
-create_user(user, password="")  # safe ignore if exists
 
 user_data = get_user(user)
 
 plan = user_data[2]
 usage = user_data[3]
 
+FREE_LIMIT = 20
+
 # =========================
-# SIDEBAR SAAS PANEL
+# SIDEBAR (SAAS PANEL)
 # =========================
 
-st.sidebar.divider()
-st.sidebar.subheader("💰 SaaS Panel")
+st.sidebar.title("💰 AI SaaS Panel")
 
-st.sidebar.write("User:", user)
-st.sidebar.write("Plan:", plan)
-st.sidebar.write("Usage:", f"{usage}/{FREE_LIMIT}" if plan == "free" else "∞")
+st.sidebar.markdown(f"""
+👤 **User:** {user}  
+📦 **Plan:** {plan}  
+📊 **Usage:** {usage}/{FREE_LIMIT if plan=='free' else '∞'}
+""")
 
 if plan == "free":
-    if st.sidebar.button("💳 Upgrade to Pro"):
+    if st.sidebar.button("⚡ Upgrade to Pro"):
         set_plan(user, "pro")
         st.rerun()
+
+st.sidebar.divider()
 
 # =========================
 # LIMIT CONTROL
@@ -94,29 +141,22 @@ def can_use():
     return plan == "pro" or usage < FREE_LIMIT
 
 # =========================
-# AI ENGINE
+# AI ENGINE (SAFE MOCK)
 # =========================
 
 def call_ai(prompt):
-
     try:
         r = requests.post(
-            "https://api.pollinations.ai/text",
-            json={
-                "prompt": prompt,
-                "model": "gpt-4o-mini",
-                "api_key": API_KEY
-            },
-            timeout=20
+            "https://text.pollinations.ai/",
+            json={"prompt": prompt},
+            timeout=30
         )
-
         if r.status_code == 200:
             return r.text
-
     except:
         pass
 
-    return "⚠️ AI temporarily unavailable"
+    return "⚠️ AI service temporarily unavailable"
 
 def run_ai(prompt):
 
@@ -128,89 +168,43 @@ def run_ai(prompt):
     return call_ai(prompt)
 
 # =========================
-# UI
+# MAIN DASHBOARD
 # =========================
 
-st.title("🧠 AI Analyst Pro SaaS")
-st.caption("Login + AI + CSV + Agent + Dashboard")
+st.markdown("---")
 
-task = st.selectbox(
-    "Mode",
-    ["Single Analysis", "AI Agent Mode", "CSV Dashboard"]
-)
-
-input_text = st.text_area("Enter your data")
+tab1, tab2, tab3 = st.tabs(["🧠 AI Analyst", "📊 CSV Dashboard", "📄 Reports"])
 
 # =========================
-# SINGLE ANALYSIS
+# TAB 1 - AI ANALYST
 # =========================
 
-if task == "Single Analysis":
+with tab1:
 
-    if st.button("Run AI") and input_text:
+    st.subheader("AI Analysis Engine")
 
-        prompt = f"Analyze:\n{input_text}"
+    input_text = st.text_area("Enter your data / question", height=150)
 
-        with st.spinner("Thinking..."):
+    if st.button("🚀 Run AI Analysis") and input_text:
+
+        with st.spinner("Analyzing..."):
+
+            prompt = f"Analyze this professionally:\n{input_text}"
 
             result = run_ai(prompt)
 
-        st.subheader("📊 Result")
+        st.success("Done")
+
+        st.markdown("### 📊 Result")
         st.write(result)
 
-        # PDF EXPORT
-        if st.button("📄 Export PDF"):
-
-            file = generate_pdf(result, "report.pdf")
-
-            with open(file, "rb") as f:
-                st.download_button("Download Report", f, file_name="report.pdf")
-
 # =========================
-# AI AGENT MODE
+# TAB 2 - CSV DASHBOARD
 # =========================
 
-if task == "AI Agent Mode":
+with tab2:
 
-    def agent_loop(text, rounds=3):
-
-        output = []
-
-        for i in range(rounds):
-
-            prompt = f"""
-You are an AI analyst agent.
-
-Iteration {i+1}
-Analyze:
-{text}
-Improve insights.
-"""
-
-            res = run_ai(prompt)
-            output.append(res)
-
-            time.sleep(1)
-
-        return "\n\n".join(output)
-
-    if st.button("Run Agent") and input_text:
-
-        result = agent_loop(input_text)
-
-        st.subheader("🧠 Agent Output")
-        st.write(result)
-
-        file = generate_pdf(result, "agent_report.pdf")
-
-        with open(file, "rb") as f:
-            st.download_button("Download Agent Report", f, file_name="agent_report.pdf")
-
-# =========================
-# CSV DASHBOARD
-# =========================
-
-if task == "CSV Dashboard":
+    st.subheader("📊 Data Dashboard")
 
     file = st.file_uploader("Upload CSV")
 
@@ -224,29 +218,44 @@ if task == "CSV Dashboard":
 
         if len(numeric) > 0:
 
-            col = st.selectbox("Metric", numeric)
+            col = st.selectbox("Select metric", numeric)
 
-            fig = px.line(df, y=col, title=f"{col} Trend")
+            st.line_chart(df[col])
 
-            st.plotly_chart(fig)
+            if st.button("🧠 AI Insight"):
 
-            if st.button("AI Insight"):
-
-                prompt = f"Analyze dataset column: {df[col].to_string()}"
+                prompt = f"Analyze this dataset column:\n{df[col].to_string()}"
 
                 result = run_ai(prompt)
 
                 st.write(result)
 
-                file = generate_pdf(result, "csv_report.pdf")
+# =========================
+# TAB 3 - REPORTS
+# =========================
 
-                with open(file, "rb") as f:
-                    st.download_button("Download Report", f, file_name="csv_report.pdf")
+with tab3:
+
+    st.subheader("📄 Auto Reports")
+
+    text = st.text_area("Generate report from data")
+
+    if st.button("Generate Report") and text:
+
+        prompt = f"""
+Create a professional business report:
+
+{text}
+"""
+
+        report = run_ai(prompt)
+
+        st.markdown("### Report")
+        st.write(report)
 
 # =========================
 # FOOTER
 # =========================
 
-st.sidebar.divider()
-st.sidebar.write("⚡ SaaS Mode Active")
-st.sidebar.write("🧠 AI Analyst Pro v3")
+st.markdown("---")
+st.caption("🧠 AI Analyst Pro SaaS • Modern Dashboard UI")
