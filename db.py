@@ -1,26 +1,16 @@
 import sqlite3
-import os
 from datetime import datetime
 import hashlib
 
-DB_NAME = "saas.db"
-
-# 🔥 AUTO RESET FIX (CRITICAL)
-if os.path.exists(DB_NAME):
-    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-else:
-    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-
+conn = sqlite3.connect("saas.db", check_same_thread=False)
 c = conn.cursor()
 
 # =========================
-# FORCE SAFE TABLE CREATE
+# TABLE
 # =========================
 
-c.execute("DROP TABLE IF EXISTS users")
-
 c.execute("""
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
     password TEXT,
     plan TEXT,
@@ -32,14 +22,14 @@ CREATE TABLE users (
 conn.commit()
 
 # =========================
-# HASH
+# SECURITY
 # =========================
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # =========================
-# CREATE USER (FIXED)
+# USER CREATE
 # =========================
 
 def create_user(username, password):
@@ -58,7 +48,7 @@ def create_user(username, password):
         conn.commit()
 
 # =========================
-# LOGIN
+# LOGIN CHECK
 # =========================
 
 def check_login(username, password):
@@ -72,7 +62,7 @@ def check_login(username, password):
     return row[0] == hash_password(password)
 
 # =========================
-# GET USER
+# GET USER (SAFE)
 # =========================
 
 def get_user(username):
